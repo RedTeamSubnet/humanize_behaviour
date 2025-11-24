@@ -22,7 +22,7 @@ fi
 
 ## --- Variables --- ##
 # Load from envrionment variables:
-PROJECT_SLUG="${PROJECT_SLUG:-rest.rt-hb-challenger}"
+PROJECT_SLUG="${PROJECT_SLUG:-rest.rt-abs-challenger}"
 
 # Flags:
 _IS_ALL=false
