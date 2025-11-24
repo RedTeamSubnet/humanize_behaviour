@@ -38,7 +38,7 @@ jobs:
           python -m pip install -r ./requirements/requirements.build.txt
       - name: Build the package
         run: |
-          ./scripts/build-python.sh -c
+          ./scripts/build.sh -c
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
