@@ -32,7 +32,9 @@ RUN _BUILD_TARGET_ARCH=$(uname -m) && \
 		libssl-dev \
 		pkg-config \
 		rustc \
-		cargo && \
+		cargo \
+		graphviz \
+		graphviz-dev && \
 	_MINICONDA_VERSION=py310_25.1.1-2 && \
 	if [ "${_BUILD_TARGET_ARCH}" == "x86_64" ]; then \
 		_MINICONDA_FILENAME=Miniconda3-${_MINICONDA_VERSION}-Linux-x86_64.sh && \
