@@ -44,55 +44,31 @@ _TMP_ACTION_LIST: List[Dict[str, Union[int, str, Dict[str, Dict[str, int]]]]] = 
     )[0]
 )
 
-_KEY_PAIRS: List[KeyPairPM] = ch_utils.gen_key_pairs(
-    n_challenge=config.challenge.n_ch_per_epoch,
-    key_size=config.api.security.asymmetric.key_size,
-)
-_CUR_KEY_PAIR: Union[KeyPairPM, None] = None
-_CUR_SCORE: Union[float, None] = None
-_CHALLENGES_ACTION_LIST: List[
-    List[Dict[str, Union[int, str, Dict[str, Dict[str, int]]]]]
-] = ch_utils.gen_cb_actions(
-    n_challenge=config.challenge.n_ch_per_epoch,
-    window_width=config.challenge.window_width,
-    window_height=config.challenge.window_height,
-    n_checkboxes=config.challenge.n_checkboxes,
-    min_distance=config.challenge.cb_min_distance,
-    max_factor=config.challenge.cb_gen_max_factor,
-    checkbox_size=config.challenge.cb_size,
-    exclude_areas=config.challenge.cb_exclude_areas,
-    pre_action_list=config.challenge.cb_pre_action_list,
-)
-_CUR_ACTION_LIST: Union[
-    List[Dict[str, Union[int, str, Dict[str, Dict[str, int]]]]], None
-] = None
 
+class TaskManager:
+    """
+    Task Manager for handling key pairs, action lists, and evaluation metrics
+    during challenge sessions.
+    """
 
-def get_task() -> MinerInput:
+    @validate_call
+    def __init__(self, uid: str = None):
+        self.uid = uid
+        self.reset_tasks()
+        self.action_metric_pair = {}
 
-    _miner_input = MinerInput()
-    return _miner_input
+    def reset_tasks(self) -> None:
+        """Reset all tasks, regenerate key pairs and action lists"""
+        self._actions_idx = 0
 
-
-@validate_call
-def score(miner_output: MinerOutput, reset: bool) -> float:
-
-    global _KEY_PAIRS
-    global _CHALLENGES_ACTION_LIST
-    global _CUR_KEY_PAIR
-    global _CUR_ACTION_LIST
-    global _CUR_SCORE
-
-    _container_name = "bot_container"
-    ch_utils.stop_container(container_name=_container_name)
-
-    if reset:
-        _KEY_PAIRS = ch_utils.gen_key_pairs(
-            n_challenge=config.challenge.n_ch_per_epoch,
+        # Generate key pairs
+        self.key_pairs = ch_utils.gen_key_pairs(
+            n_challenge=config.challenge.n_ch_per_epoch * config.challenge.n_run_per_ch,
             key_size=config.api.security.asymmetric.key_size,
         )
 
-        _CHALLENGES_ACTION_LIST = ch_utils.gen_cb_actions(
+        # Generate challenge actions
+        self.challenges_action_list = ch_utils.gen_cb_actions(
             n_challenge=config.challenge.n_ch_per_epoch,
             window_width=config.challenge.window_width,
             window_height=config.challenge.window_height,
@@ -101,31 +77,89 @@ def score(miner_output: MinerOutput, reset: bool) -> float:
             max_factor=config.challenge.cb_gen_max_factor,
             checkbox_size=config.challenge.cb_size,
             exclude_areas=config.challenge.cb_exclude_areas,
-            pre_action_list=config.challenge.cb_pre_action_list,
         )
 
-    if not _KEY_PAIRS:
-        raise BaseHTTPException(
-            error_enum=ErrorCodeEnum.TOO_MANY_REQUESTS,
-            message=f"No initialized key pairs or out of key pairs, this endpoint is shouldn't be called directly!",
-        )
+        # Reset current task properties
+        self.cur_key_pair = None
+        self.cur_action_list = None
+        self.cur_score = None
+        self.action_metric_pair = {}
 
-    if not _CHALLENGES_ACTION_LIST:
-        raise BaseHTTPException(
-            error_enum=ErrorCodeEnum.TOO_MANY_REQUESTS,
-            message=f"No initialized action lists or out of action lists, this endpoint is shouldn't be called directly!",
-        )
+    def pop_task(self) -> Union[Tuple[KeyPairPM, List[Dict]], None]:
+        """Get the next task (key pair and action list)"""
+        if not self.key_pairs or not self.challenges_action_list:
+            return None
 
-    _CUR_KEY_PAIR = _KEY_PAIRS.pop(0)
-    _CUR_ACTION_LIST = _CHALLENGES_ACTION_LIST.pop(0)
-    _CUR_SCORE = None
+        self.cur_key_pair = self.key_pairs.pop(0)
+        self.cur_action_list = self.challenges_action_list.pop(0)
 
-    logger.debug(f"Current action list: {_CUR_ACTION_LIST}")
+        return (self.cur_key_pair, self.cur_action_list)
 
+    def get_next_action_list(
+        self,
+    ) -> List[Dict[str, Union[int, str, Dict[str, Dict[str, int]]]]]:
+        """Get the next action list"""
+        if not self.challenges_action_list:
+            return _TMP_ACTION_LIST
+
+        return self.challenges_action_list[self._actions_idx]
+
+    def has_remaining_tasks(self) -> bool:
+        """Check if there are remaining tasks"""
+        return len(self.key_pairs) > 0 and len(self.challenges_action_list) > 0
+
+    def get_remaining_task_count(self) -> int:
+        """Get the number of remaining tasks"""
+        return min(len(self.key_pairs), len(self.challenges_action_list))
+
+    def record_metric(self, data: Dict) -> None:
+        """Record a metric from the current session"""
+        num_finished_sessions = len(self.action_metric_pair.keys()) + 1
+        self.action_metric_pair[f"{num_finished_sessions}"] = data
+
+    def is_last_session(self) -> bool:
+        """Check if this is the last session in the epoch"""
+        logger.info(f"Current session: {len(self.action_metric_pair.keys())}, ")
+        return len(self.action_metric_pair.keys()) == config.challenge.n_run_per_ch
+
+    def get_nonce(self) -> str:
+        _nonce_key: str = self.cur_key_pair.public_key
+        self.cur_key_pair.public_key = None
+        self.cur_key_pair.nonce = None
+        return _nonce_key
+
+    def get_private_key(self) -> str:
+        _private_key: str = self.cur_key_pair.private_key
+        self.cur_key_pair.private_key = None
+        return _private_key
+
+
+# Initialize the task manager as a global variable
+global tm
+tm = TaskManager()
+
+
+def get_task() -> MinerInput:
+    """Get the task for the miner"""
+    _miner_input = MinerInput()
+    return _miner_input
+
+
+@validate_call
+def score(miner_output: MinerOutput) -> float:
+    """Score the miner output"""
     _score = 0.0
+    _num_tasks = config.challenge.n_ch_per_epoch
 
-    logger.debug("Scoring the miner output...")
+    # Reset the task manager if needed
+    if not tm.has_remaining_tasks():
+        tm.reset_tasks()
+
+    if tm.get_remaining_task_count() < _num_tasks:
+        tm.reset_tasks()
+
     try:
+        _container_name = "bot_container"
         if miner_output.pip_requirements:
             ch_utils.check_pip_requirements(
                 pip_requirements=miner_output.pip_requirements,
@@ -134,7 +168,9 @@ def score(miner_output: MinerOutput, reset: bool) -> float:
 
         _build_dir = os.path.join(config.api.paths.tmp_dir, "bot")
         ch_utils.copy_bot_files(
-            miner_output=miner_output, src_dir=str(_src_dir / "bot"), dst_dir=_build_dir
+            miner_output=miner_output,
+            src_dir=str(_src_dir / "bot"),
+            dst_dir=_build_dir,
         )
 
         _docker_client = docker.from_env()
@@ -145,9 +181,18 @@ def score(miner_output: MinerOutput, reset: bool) -> float:
             system_deps=miner_output.system_deps,
             image_name=_image_name,
         )
+
+        # Get the next task
+        task = tm.pop_task()
+        tm.cur_score = None
+        if not task:
+            raise BaseHTTPException(
+                error_enum=ErrorCodeEnum.TOO_MANY_REQUESTS,
+                message=f"No initialized key pairs or action lists, or out of tasks!",
+            )
         ch_utils.run_bot_container(
+            action_list=tm.cur_action_list,
             docker_client=_docker_client,
-            action_list=_CUR_ACTION_LIST,
             image_name=_image_name,
             container_name=_container_name,
             ulimit=config.challenge.docker_ulimit,
@@ -155,22 +200,20 @@ def score(miner_output: MinerOutput, reset: bool) -> float:
 
         _i = 0
         while True:
-            if _CUR_SCORE is not None:
-                _score = _CUR_SCORE
-                _CUR_SCORE = None
+            if tm.cur_score is not None:
+                _score = tm.cur_score
+                tm.cur_score = None
+                logger.info("Successfully scored the miner output.")
                 break
 
-            logger.debug("Waiting for the bot to finish...")
+            logger.info(f"Waiting for the bot to finish... {tm.cur_score is not None}")
             time.sleep(1)
             _i += 1
 
             if config.challenge.bot_timeout < _i:
-                raise BaseHTTPException(
-                    error_enum=ErrorCodeEnum.BAD_REQUEST,
-                    message=f"Timeout error: Bot running too long or failed to finish!",
-                )
+                logger.error("Timeout error: Bot running too long or failed to finish!")
+                break
 
-        logger.debug("Successfully scored the miner output.")
     except Exception as err:
         if isinstance(err, BaseHTTPException):
             raise
@@ -183,10 +226,10 @@ def score(miner_output: MinerOutput, reset: bool) -> float:
 
 @validate_call(config={"arbitrary_types_allowed": True})
 def get_web(request: Request) -> HTMLResponse:
-
+    """Get the web interface for the challenge"""
     _nonce = None
-    if _CUR_KEY_PAIR:
-        _nonce = _CUR_KEY_PAIR.nonce
+    if tm.cur_key_pair:
+        _nonce = tm.cur_key_pair.nonce
     else:
         _nonce = utils.gen_random_string()
         logger.warning(
@@ -194,8 +237,8 @@ def get_web(request: Request) -> HTMLResponse:
         )
 
     _action_list = []
-    if _CUR_ACTION_LIST:
-        _action_list = _CUR_ACTION_LIST
+    if tm.cur_action_list:
+        _action_list = tm.cur_action_list
     else:
         _action_list = _TMP_ACTION_LIST
         logger.warning(
@@ -221,68 +264,78 @@ def get_web(request: Request) -> HTMLResponse:
 
 @validate_call
 def get_random_val(nonce: str) -> str:
-
-    global _CUR_KEY_PAIR
-
-    if not _CUR_KEY_PAIR:
+    """Get the random value for the nonce"""
+    if not tm.cur_key_pair:
         raise BaseHTTPException(
             error_enum=ErrorCodeEnum.BAD_REQUEST,
             message=f"Not initialized key pair or out of key pair, this endpoint is shouldn't be called directly!",
         )
 
-    if _CUR_KEY_PAIR.nonce != nonce:
+    if tm.cur_key_pair.nonce != nonce:
         raise BaseHTTPException(
             error_enum=ErrorCodeEnum.UNAUTHORIZED,
             message=f"Invalid nonce value!",
         )
 
-    if not _CUR_KEY_PAIR.public_key:
+    if not tm.cur_key_pair.public_key:
         raise BaseHTTPException(
             error_enum=ErrorCodeEnum.TOO_MANY_REQUESTS,
             message=f"Nonce is already retrieved!",
         )
 
-    _nonce_key: str = _CUR_KEY_PAIR.public_key
-    _CUR_KEY_PAIR.public_key = None
-    _CUR_KEY_PAIR.nonce = None
-
+    _nonce_key = tm.get_nonce()
     return _nonce_key
 
 
 @validate_call
 def eval_bot(data: str) -> None:
-
-    global _CUR_KEY_PAIR
-    global _CUR_ACTION_LIST
-    global _CUR_SCORE
-
-    if not _CUR_KEY_PAIR:
+    """Evaluate the bot performance"""
+    if not tm.cur_key_pair:
         raise BaseHTTPException(
             error_enum=ErrorCodeEnum.BAD_REQUEST,
             message=f"Not initialized key pair or out of key pair, this endpoint is shouldn't be called directly!",
         )
 
-    if not _CUR_ACTION_LIST:
-        raise BaseHTTPException(
-            error_enum=ErrorCodeEnum.BAD_REQUEST,
-            message=f"Not initialized action list or out of action list, this endpoint is shouldn't be called directly!",
-        )
-
-    _private_key: str = _CUR_KEY_PAIR.private_key
-    _CUR_KEY_PAIR = None
+    _private_key: str = tm.get_private_key()
 
     logger.debug("Evaluating the bot...")
+
     try:
         _plaintext = ch_utils.decrypt(ciphertext=data, private_key=_private_key)
-
-        _metrics_processor = MetricsProcessor(config={"actions": _CUR_ACTION_LIST})
         _plain_data = json.loads(_plaintext)
-        _result = _metrics_processor(data=_plain_data)
-        _CUR_ACTION_LIST = None
-        logger.info(f"Bot evaluation result: {_result}")
-        _CUR_SCORE = _result["analysis"]["score"]
-        logger.info(f"Bot score: {_CUR_SCORE}")
 
+        # Record this metric
+        tm.record_metric(_plain_data)
+
+        # If this is the last session, evaluate all metrics
+        if tm.is_last_session():
+            _metrics_processor = MetricsProcessor(
+                config={"actions": tm.cur_action_list}
+            )
+            _result = _metrics_processor(data=tm.action_metric_pair)
+            _cur_sesion_score = _result["analysis"]["score"]
+
+            logger.info(f"Bot evaluation result: {_result}")
+            if tm.cur_score is not None:
+                tm.cur_score += (
+                    _cur_sesion_score / config.challenge.n_ch_per_epoch
+                    if _cur_sesion_score != 0
+                    else 0
+                )
+            else:
+                tm.cur_score = (
+                    _cur_sesion_score / config.challenge.n_ch_per_epoch
+                    if _cur_sesion_score != 0
+                    else 0
+                )
+            logger.info(f"Bot current score: {tm.cur_score}")
+
+            # Reset for next epoch
+            tm.action_metric_pair = {}
+            tm.cur_key_pair = None
+            tm.pop_task()
+        else:
+            tm.pop_task()
         logger.debug("Successfully evaluated the bot.")
     except Exception as err:
         if isinstance(err, BaseHTTPException):
@@ -294,10 +347,7 @@ def eval_bot(data: str) -> None:
     return
 
 
-@validate_call
-def compare_outputs(
-    miner_input: MinerInput, miner_output: MinerOutput, reference_output: MinerOutput
-) -> float:
+def compare_outputs(miner_input, miner_output, reference_output) -> float:
     """
     Compare miner's output against a reference output using CFGAnalyser and CFGComparer.
 
@@ -312,16 +362,15 @@ def compare_outputs(
     try:
         logger.info("Analyzing miner output...")
 
-        miner_code = miner_output.bot_py
-        reference_code = reference_output.bot_py
+        miner_code = miner_output["cfg_output"]
+        reference_code = reference_output["cfg_output"]
 
         if not miner_code or not reference_code:
             logger.error("Missing bot_py in miner_output or reference_output.")
             return 0.0
-
-        comparison_result = CFGManager().run_raw_scripts_comparison(
-            str_script_1=miner_code,
-            str_script_2=reference_code,
+        comparison_result = CFGManager().comparer.run(
+            source_data=miner_code,
+            target_list=[reference_code],
         )
 
         similarity_score = comparison_result.get("maximum_similarity", 0.0)
@@ -334,6 +383,49 @@ def compare_outputs(
         return 0.0
 
 
+def analyse_output(miner_output) -> dict:
+    """
+    Analyzes miner output using CFGAnalyser
+
+    Args:
+        miner_output (dict): The output from the current miner (expects "bot_py" key).
+
+    Returns:
+        dict: CFG hashed output that will be used for comparison.
+
+    Note:
+        returns `{}` if an error occurs during analysis.
+    """
+    try:
+        logger.info("Analyzing miner output...")
+
+        miner_code = miner_output["miner_output"]["bot_py"]
+
+        if not miner_code:
+            logger.error("Missing bot_py in miner_output")
+            return {}
+
+        _analyzed_script = CFGManager().analyser.run(data=miner_code)
+
+        _is_error = _analyzed_script["error"]["occurred"]
+
+        logger.info(f"Error state(is error occurred): {_is_error}")
+        if _is_error:
+            if _analyzed_script["error"]["message"] == "Failed to preprocess the data!":
+                logger.error(f"Error message: {_analyzed_script['error']['message']}")
+            else:
+                logger.info(f"Error message: {_analyzed_script['error']['message']}")
+                return {}
+
+        _final_cfg_output = _analyzed_script["data"]
+
+        return _final_cfg_output
+
+    except Exception as err:
+        logger.error(f"Error in analyse_output function: {str(err)}")
+        return {}
+
+
 __all__ = [
     "get_task",
     "get_web",
@@ -341,4 +433,5 @@ __all__ = [
     "score",
     "eval_bot",
     "compare_outputs",
+    "analyse_output",
 ]

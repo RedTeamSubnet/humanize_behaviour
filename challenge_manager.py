@@ -51,7 +51,7 @@ class HBChallengeManager(ChallengeManager):
 
             try:
                 # Compute mean score
-                score = np.max(
+                score = np.nanmax(
                     [scoring_log.score for scoring_log in miner_commit.scoring_logs]
                 ).item()
                 if np.isnan(score):
@@ -126,10 +126,10 @@ class HBChallengeManager(ChallengeManager):
         for miner_state in self.miner_states.values():
             best_commit = miner_state.best_commit
 
-            if (
-                best_commit is None
-                or miner_state.miner_uid >= n_uids
-                or miner_state.miner_hotkey not in self.metagraph.hotkeys
+            if best_commit is None or not (
+                miner_state.miner_uid < len(self.metagraph.hotkeys)
+                and miner_state.miner_hotkey
+                == self.metagraph.hotkeys[miner_state.miner_uid]
             ):
                 continue
 
@@ -153,10 +153,10 @@ class HBChallengeManager(ChallengeManager):
         # Step 3: Apply decay and adjustment
         for miner_state in self.miner_states.values():
             best_commit = miner_state.best_commit
-            if (
-                best_commit is None
-                or miner_state.miner_uid >= n_uids
-                or miner_state.miner_hotkey not in self.metagraph.hotkeys
+            if best_commit is None or not (
+                miner_state.miner_uid < len(self.metagraph.hotkeys)
+                and miner_state.miner_hotkey
+                == self.metagraph.hotkeys[miner_state.miner_uid]
             ):
                 continue  # Skip invalid miners
 
@@ -238,14 +238,24 @@ class HBChallengeManager(ChallengeManager):
 
     def _apply_softmax(self, scores):
         """Apply softmax with custom temperature to scores."""
-        scores = np.asarray(scores)  # Convert to NumPy array
-        if np.sum(scores) == 0:
+
+        scores = np.asarray(scores)
+        mask_nonzero = scores != 0
+
+        if not np.any(mask_nonzero):
             return scores
-        scores = np.clip(scores, 0, None)
-        scaled_scores = scores / self.reward_temperature
+
+        nonzero_scores = scores[mask_nonzero]
+        nonzero_scores = np.clip(nonzero_scores, 0, None)
+        scaled_scores = nonzero_scores / self.reward_temperature
         max_score = np.max(scaled_scores)
         scores_exp = np.exp(scaled_scores - max_score)
-        return scores_exp / np.sum(scores_exp)
+        softmax_values = scores_exp / np.sum(scores_exp)
+
+        softmax_result = np.zeros_like(scores, dtype=float)
+        softmax_result[mask_nonzero] = softmax_values
+
+        return softmax_result
 
     def _inverse_easePolyOut_exponent(self, y: float, exponent: float = 0.600) -> float:
         """Inverse of the polynomial ease-out function, y must be in the range [0, 1]."""

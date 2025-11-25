@@ -12,7 +12,6 @@ from api.logger import logger
 from api.config import config
 
 
-
 router = APIRouter(tags=["Challenge"])
 
 
@@ -56,44 +55,30 @@ def post_score(
     request: Request,
     miner_input: MinerInput,
     miner_output: MinerOutput,
-    reset: bool = Query(
-        default=False,
-        title="Reset",
-        description="Reset the challenge.",
-        examples=[False],
-    ),
 ):
 
     _request_id = request.state.request_id
     logger.info(f"[{_request_id}] - Evaluating the miner output...")
 
     _score: float = 0.0
-    _scores = []
-    for i in range(config.challenge.n_ch_per_epoch):
-        try:
-            reset = False
+    try:
 
-            if i == 0:
-                reset = True
+        _score = service.score(miner_output=miner_output)
 
-            _score = service.score(miner_output=miner_output, reset=reset)
-            _scores.append(_score)
-
-            logger.success(f"[{_request_id}] - Successfully evaluated the miner output.")
-        except Exception as err:
-            if isinstance(err, HTTPException):
-                # raise
-                logger.error(
-                    f"[{_request_id}] - Failed to evaluate the miner output!",
-                )
-
+        logger.success(f"[{_request_id}] - Successfully evaluated the miner output.")
+    except Exception as err:
+        if isinstance(err, HTTPException):
+            # raise
             logger.error(
                 f"[{_request_id}] - Failed to evaluate the miner output!",
             )
-            # raise
 
-    _score = sum(_scores) / config.challenge.n_ch_per_epoch
-
+        logger.error(
+            f"[{_request_id}] - Failed to evaluate the miner output!",
+        )
+        # raise
+        return None
+    logger.success(f"[{_request_id}] - Successfully scored the miner output: {_score}")
     return _score
 
 
@@ -206,9 +191,9 @@ def _post_eval_bot(
 )
 def post_compare(
     request: Request,
-    miner_input: MinerInput = Body(...),
-    miner_output: MinerOutput = Body(...),
-    reference_output: MinerOutput = Body(...),
+    miner_output: dict = Body(...),
+    reference_output: dict = Body(...),
+    miner_input: dict = Body(...),
 ):
     _request_id = request.state.request_id
     logger.info(f"[{_request_id}] - Comparing miner outputs...")
@@ -225,6 +210,29 @@ def post_compare(
         raise HTTPException(status_code=500, detail="Error in comparison request")
 
     return {"similarity_score": _score}
+
+
+@router.post(
+    "/analyse",
+    summary="Compare miner outputs",
+    description="This endpoints returns output of the miner.",
+    response_class=JSONResponse,
+    responses={500: {}},
+)
+def post_analyse(request: Request, miner_output: dict = Body(...)):
+    _request_id = request.state.request_id
+    logger.info(f"[{_request_id}] - Analyzing miner outputs...")
+
+    try:
+        _analyzation_result = service.analyse_output(
+            miner_output=miner_output,
+        )
+        logger.success(f"[{_request_id}] - Successfully analysed miner outputs.")
+    except Exception as err:
+        logger.error(f"[{_request_id}] - Error analyzing miner outputs: {str(err)}")
+        raise HTTPException(status_code=500, detail="Error in analyzing miner output")
+
+    return {"analyzed_output": _analyzation_result}
 
 
 __all__ = ["router"]

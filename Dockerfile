@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# check=skip=SecretsUsedInArgOrEnv
 
 ARG BASE_IMAGE=ubuntu:22.04
 
@@ -20,7 +21,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR "/usr/src/${HBC_API_SLUG}"
 
 RUN _BUILD_TARGET_ARCH=$(uname -m) && \
-    echo "BUILDING TARGET ARCHITECTURE: $_BUILD_TARGET_ARCH" && \
+	echo "BUILDING TARGET ARCHITECTURE: $_BUILD_TARGET_ARCH" && \
 	rm -rfv /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* && \
 	apt-get clean -y && \
 	apt-get update --fix-missing -o Acquire::CompressionTypes::Order::=gz && \
@@ -28,13 +29,9 @@ RUN _BUILD_TARGET_ARCH=$(uname -m) && \
 		ca-certificates \
 		build-essential \
 		git \
-		wget \
-		libssl-dev \
-		pkg-config \
-		rustc \
-		cargo \
 		graphviz \
-		graphviz-dev && \
+		graphviz-dev \
+		wget && \
 	_MINICONDA_VERSION=py310_25.1.1-2 && \
 	if [ "${_BUILD_TARGET_ARCH}" == "x86_64" ]; then \
 		_MINICONDA_FILENAME=Miniconda3-${_MINICONDA_VERSION}-Linux-x86_64.sh && \
@@ -52,6 +49,8 @@ RUN _BUILD_TARGET_ARCH=$(uname -m) && \
 	/bin/bash "/root/${_MINICONDA_FILENAME}" -b -u -p /opt/conda && \
 	/opt/conda/condabin/conda update -y conda && \
 	/opt/conda/condabin/conda install -y python=${PYTHON_VERSION} pip && \
+	# /opt/conda/condabin/conda install -y python=${PYTHON_VERSION} graphviz pip && \
+	# /opt/conda/condabin/conda install -y --channel conda-forge pygraphviz && \
 	/opt/conda/bin/pip install --timeout 60 -U pip
 
 COPY requirements ./requirements
@@ -67,7 +66,6 @@ FROM ${BASE_IMAGE} AS base
 ARG DEBIAN_FRONTEND
 ARG HBC_API_SLUG
 
-ARG DOCKER_VERSION="28.5.2"
 ARG HBC_HOME_DIR="/app"
 ARG HBC_API_DIR="${HBC_HOME_DIR}/${HBC_API_SLUG}"
 ARG HBC_API_DATA_DIR="/var/lib/${HBC_API_SLUG}"
@@ -111,9 +109,11 @@ RUN rm -rfv /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /root/.cache/*
 		net-tools \
 		curl \
 		iproute2 \
-		skopeo \
+		graphviz \
+		graphviz-dev \
+		# skopeo \
 		nano && \
-	curl -fsSL https://get.docker.com/ | sh -s -- --version ${DOCKER_VERSION} && \
+	curl -fsSL https://get.docker.com/ | sh && \
 	apt-get clean -y && \
 	sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
 	sed -i -e 's/# en_AU.UTF-8 UTF-8/en_AU.UTF-8 UTF-8/' /etc/locale.gen && \
@@ -136,12 +136,13 @@ RUN rm -rfv /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /root/.cache/*
 	echo "conda activate base" >> "/home/${USER}/.bashrc" && \
 	rm -rfv /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /root/.cache/* "/home/${USER}/.cache/*" && \
 	mkdir -pv "${HBC_API_DIR}" "${HBC_API_DATA_DIR}" "${HBC_API_LOGS_DIR}" "${HBC_API_TMP_DIR}" && \
-	skopeo copy docker://redteamsn61/hbc-bot-base:latest docker-archive:/app/redteamsn61_hbc-bot-base.tar &&\
+	# skopeo copy docker://redteamsn61/hbc-bot-base:latest docker-archive:/app/redteamsn61_hbc-bot-base.tar &&\
 	chown -Rc "${USER}:${GROUP}" "${HBC_HOME_DIR}" "${HBC_API_DATA_DIR}" "${HBC_API_LOGS_DIR}" "${HBC_API_TMP_DIR}" && \
 	find "${HBC_API_DIR}" "${HBC_API_DATA_DIR}" -type d -exec chmod -c 770 {} + && \
 	find "${HBC_API_DIR}" "${HBC_API_DATA_DIR}" -type d -exec chmod -c ug+s {} + && \
 	find "${HBC_API_LOGS_DIR}" "${HBC_API_TMP_DIR}" -type d -exec chmod -c 775 {} + && \
 	find "${HBC_API_LOGS_DIR}" "${HBC_API_TMP_DIR}" -type d -exec chmod -c +s {} +
+
 
 ENV LANG=en_US.UTF-8 \
 	LANGUAGE=en_US.UTF-8 \

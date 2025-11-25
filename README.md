@@ -1,6 +1,6 @@
-# Humanize Behaviour v2 Challenge
+# Humanize Behaviour v3 Challenge
 
-The **Humanize Behaviour v2** is designed to test the ability of a bot script to mimic human interaction with a Web UI form. The challenge measures how well the bot script can interact with the form and submit the required information.
+The **Humanize Behaviour v3** is improved version of **Humanize Behaviour v2** designed to test the ability of a bot script to mimic human interaction with a Web UI form but now it has a new check which will compare the movement of a bot script in different sessions to see if the movements are dynamic. The challenge measures how well the bot script can interact with the form and submit the required information.
 
 ## ✨ Features
 
@@ -12,6 +12,7 @@ The **Humanize Behaviour v2** is designed to test the ability of a bot script to
 - Dockerfile for deployment
 - FastAPI
 - Web service
+- **Trajectory similarity check**
 
 ---
 
@@ -22,10 +23,7 @@ The **Humanize Behaviour v2** is designed to test the ability of a bot script to
 - Install **Python (>= v3.10)** and **pip (>= 23)**:
     - **[RECOMMENDED] [Miniconda (v3)](https://docs.anaconda.com/miniconda)**
     - *[arm64/aarch64] [Miniforge (v3)](https://github.com/conda-forge/miniforge)*
-    - *[Python virutal environment] [venv](https://docs.python.org/3/library/venv.html)*
-- Install **[graphviz](https://graphviz.org/download)**
-- Install **[pygraphviz](https://pygraphviz.github.io/documentation/stable/install.html)**
-
+    - *[Python virtual environment] [venv](https://docs.python.org/3/library/venv.html)*
 [OPTIONAL] For **DEVELOPMENT** environment:
 
 - Install [**git**](https://git-scm.com/downloads)
@@ -51,14 +49,14 @@ cd ~/workspaces/projects
 
 ```sh
 git clone https://github.com/RedTeamSubnet/RedTeam.git && \
-    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v2
+    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v3
 ```
 
 **OPTION B.** Clone the repository (for **DEVELOPMENT**: git + ssh key):
 
 ```sh
 git clone --recursive git@github.com:RedTeamSubnet/RedTeam.git && \
-    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v2 && \
+    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v3 && \
     git submodule update --init --recursive && \
     git submodule foreach --recursive git checkout main
 ```
