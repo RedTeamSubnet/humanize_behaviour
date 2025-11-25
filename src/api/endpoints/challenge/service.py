@@ -11,7 +11,6 @@ from pydantic import validate_call
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from cfg_analyser import CFGManager
 
 try:
     from modules.rt_hb_score import MetricsProcessor  # type: ignore
@@ -149,7 +148,7 @@ def get_task() -> MinerInput:
 def score(miner_output: MinerOutput) -> float:
     """Score the miner output"""
     _score = 0.0
-    _num_tasks = config.challenge.n_ch_per_epoch
+    _num_tasks = config.challenge.n_ch_per_epoch * config.challenge.n_run_per_ch
 
     # Reset the task manager if needed
     if not tm.has_remaining_tasks():
@@ -347,91 +346,10 @@ def eval_bot(data: str) -> None:
     return
 
 
-def compare_outputs(miner_input, miner_output, reference_output) -> float:
-    """
-    Compare miner's output against a reference output using CFGAnalyser and CFGComparer.
-
-    Args:
-        miner_input (dict): The input used for both miner outputs.
-        miner_output (dict): The output from the current miner (expects "bot_py" key).
-        reference_output (dict): The reference output.
-
-    Returns:
-        float: Similarity score between 0 and 1.
-    """
-    try:
-        logger.info("Analyzing miner output...")
-
-        miner_code = miner_output["cfg_output"]
-        reference_code = reference_output["cfg_output"]
-
-        if not miner_code or not reference_code:
-            logger.error("Missing bot_py in miner_output or reference_output.")
-            return 0.0
-        comparison_result = CFGManager().comparer.run(
-            source_data=miner_code,
-            target_list=[reference_code],
-        )
-
-        similarity_score = comparison_result.get("maximum_similarity", 0.0)
-        logger.info(f"Computed similarity score: {similarity_score}")
-
-        return max(0.0, min(1.0, similarity_score))
-
-    except Exception as err:
-        logger.error(f"Error in compare_outputs function: {str(err)}")
-        return 0.0
-
-
-def analyse_output(miner_output) -> dict:
-    """
-    Analyzes miner output using CFGAnalyser
-
-    Args:
-        miner_output (dict): The output from the current miner (expects "bot_py" key).
-
-    Returns:
-        dict: CFG hashed output that will be used for comparison.
-
-    Note:
-        returns `{}` if an error occurs during analysis.
-    """
-    try:
-        logger.info("Analyzing miner output...")
-
-        miner_code = miner_output["miner_output"]["bot_py"]
-
-        if not miner_code:
-            logger.error("Missing bot_py in miner_output")
-            return {}
-
-        _analyzed_script = CFGManager().analyser.run(data=miner_code)
-
-        _is_error = _analyzed_script["error"]["occurred"]
-
-        logger.info(f"Error state(is error occurred): {_is_error}")
-        if _is_error:
-            if _analyzed_script["error"]["message"] == "Failed to preprocess the data!":
-                logger.error(f"Error message: {_analyzed_script['error']['message']}")
-            else:
-                logger.info(f"Error message: {_analyzed_script['error']['message']}")
-                return {}
-
-        _final_cfg_output = _analyzed_script["data"]
-
-        return _final_cfg_output
-
-    except Exception as err:
-        logger.error(f"Error in analyse_output function: {str(err)}")
-        return {}
-
-
 __all__ = [
     "get_task",
     "get_web",
     "get_random_val",
     "score",
     "eval_bot",
-    "compare_outputs",
-    "analyse_output",
 ]

@@ -6,7 +6,10 @@ import bittensor as bt
 import numpy as np
 
 from redteam_core.validator.models import MinerChallengeCommit
-from redteam_core.validator.challenge_manager import ChallengeManager
+from redteam_core.validator.challenge_manager import (
+    ChallengeManager,
+    MinerChallengeInfo,
+)
 
 
 class HBChallengeManager(ChallengeManager):
@@ -15,11 +18,16 @@ class HBChallengeManager(ChallengeManager):
         super().__init__(challenge_info, metagraph)
 
         emission_config = self.challenge_info.get("emission_config", {})
+        comparison_config = self.challenge_info.get("comparison_config", {})
+
         self.stable_period_days = emission_config.get("stable_period_days", 10)
         self.expiration_days = emission_config.get("expiration_days", 15)
         self.alpha = emission_config.get("alpha", 0.002)
         self.t_max = emission_config.get("t_max", 10)
         self.reward_temperature = emission_config.get("reward_temperature", 0.2)
+        self.comparison_min_acceptable_score = comparison_config.get(
+            "min_acceptable_score", 0.7
+        )
 
         self.max_similarity = 0.4
         self.min_similarity = 0
@@ -43,33 +51,19 @@ class HBChallengeManager(ChallengeManager):
         )
 
         for miner_commit in miner_commits:
-            if miner_commit.docker_hub_id in self._unique_scored_docker_hub_ids:
-                continue  # Skip if already scored
-
-            if not miner_commit.scoring_logs:
-                continue  # Skip if no scoring logs
+            if (
+                miner_commit.docker_hub_id in self._unique_scored_docker_hub_ids
+                or not miner_commit.scoring_logs
+            ):
+                continue
 
             try:
-                # Compute mean score
-                score = np.nanmax(
-                    [scoring_log.score for scoring_log in miner_commit.scoring_logs]
-                ).item()
-                if np.isnan(score):
-                    miner_commit.score = 0.0
-                else:
-                    miner_commit.score = float(score)
+                score = miner_commit.get_higest_scoring_score()
+                miner_commit.score = float(score)
 
-                # Compute penalty
                 if miner_commit.comparison_logs:
-                    penalty_values = [
-                        np.nanmax([log.similarity_score for log in logs] or [0.0])
-                        for logs in miner_commit.comparison_logs.values()
-                    ]
-                    penalty = np.max(penalty_values).item() if penalty_values else 0
-                    if np.isnan(penalty):
-                        miner_commit.penalty = 0.0
-                    else:
-                        miner_commit.penalty = float(penalty)
+                    penalty = miner_commit.get_higest_comparison_score()
+                    miner_commit.penalty = float(penalty)
                 else:
                     miner_commit.penalty = 0.0
 
@@ -83,7 +77,7 @@ class HBChallengeManager(ChallengeManager):
             # Acceptance criteria
             miner_commit.accepted = (
                 miner_commit.penalty >= self.min_similarity
-                and miner_commit.penalty <= self.break_point
+                and miner_commit.penalty <= self.comparison_min_acceptable_score
                 and miner_commit.score >= self.min_score
             )
 
@@ -95,12 +89,14 @@ class HBChallengeManager(ChallengeManager):
             # Update miner's best submission
             miner_commit.scored_timestamp = time.time()
 
-            miner_state = self.miner_states.get(miner_commit.miner_uid)
-            if miner_state:
-                miner_state.update_best_commit(miner_commit)
-                bt.logging.debug(
-                    f"Updated best commit for miner {miner_commit.miner_uid}"
+            if miner_commit.miner_uid not in self.miner_states:
+                self.miner_states[miner_commit.miner_uid] = MinerChallengeInfo(
+                    miner_uid=miner_commit.miner_uid,
+                    miner_hotkey=miner_commit.miner_hotkey,
+                    challenge_name=miner_commit.challenge_name,
                 )
+            self.miner_states[miner_commit.miner_uid].latest_commit = miner_commit
+            self.miner_states[miner_commit.miner_uid].update_best_commit(miner_commit)
 
             # Add to unique solutions if accepted
             if miner_commit.accepted and miner_commit.encrypted_commit:
@@ -126,25 +122,18 @@ class HBChallengeManager(ChallengeManager):
         for miner_state in self.miner_states.values():
             best_commit = miner_state.best_commit
 
-            if best_commit is None or not (
-                miner_state.miner_uid < len(self.metagraph.hotkeys)
-                and miner_state.miner_hotkey
-                == self.metagraph.hotkeys[miner_state.miner_uid]
+            if (
+                best_commit is None
+                or miner_state.miner_uid >= n_uids
+                or miner_state.miner_hotkey not in self.metagraph.hotkeys
             ):
                 continue
 
             # Set initial scores
             scores[miner_state.miner_uid] = best_commit.score
 
-            # Track the latest evaluation timestamp
-            if (
-                evaluation_timestamp is None
-                or best_commit.scored_timestamp > evaluation_timestamp
-            ):
-                evaluation_timestamp = best_commit.scored_timestamp
-
         # Step 2: If no valid timestamp found, return unmodified scores
-        if evaluation_timestamp is None:
+        if scores.sum() == 0:
             bt.logging.warning(
                 "No valid scored_timestamp found, cannot apply time decay"
             )
@@ -153,14 +142,15 @@ class HBChallengeManager(ChallengeManager):
         # Step 3: Apply decay and adjustment
         for miner_state in self.miner_states.values():
             best_commit = miner_state.best_commit
-            if best_commit is None or not (
-                miner_state.miner_uid < len(self.metagraph.hotkeys)
-                and miner_state.miner_hotkey
-                == self.metagraph.hotkeys[miner_state.miner_uid]
+            if (
+                best_commit is None
+                or miner_state.miner_uid >= n_uids
+                or miner_state.miner_hotkey not in self.metagraph.hotkeys
             ):
                 continue  # Skip invalid miners
 
             commit_timestamp = best_commit.scored_timestamp
+            evaluation_timestamp = time.time()
             days_elapsed = (evaluation_timestamp - commit_timestamp) / 86400
 
             # Apply decay and adjustment
