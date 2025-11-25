@@ -85,6 +85,33 @@ def run_bot(
         )
         _login_button.click()
 
+        logger.info("Scrolling to find end-session button")
+
+        lenOfPage = driver.execute_script(
+            "window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;"
+        )
+        match = False
+        while match == False:
+            lastCount = lenOfPage
+            time.sleep(3)
+            lenOfPage = driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;"
+            )
+            if lastCount == lenOfPage:
+                match = True
+
+        _end_session_button = _wait.until(
+            EC.presence_of_element_located((By.CLASS_NAME, "end-session"))
+        )
+
+        driver.execute_script(
+            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
+            _end_session_button,
+        )
+        time.sleep(1)  # Give time for smooth scrolling to complete
+
+        _end_session_button.click()
+
         return True
 
     except Exception as err:

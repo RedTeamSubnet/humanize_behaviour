@@ -241,29 +241,35 @@ def stop_container(container_name: str = "bot_container") -> None:
     return
 
 
-@validate_call(config={"arbitrary_types_allowed": True})
+@validate_call
 def build_bot_image(
-    docker_client: DockerClient,
     build_dir: str,
     system_deps: Optional[str] = None,
     image_name: str = "bot:latest",
 ) -> None:
-
     logger.info("Building bot docker image...")
     try:
-        _kwargs = {}
-        if system_deps:
-            _kwargs["buildargs"] = {"APT_PACKAGES": system_deps}
+        _cmd = ["sudo", "docker", "build", "-t", image_name, "--rm"]
 
-        _, _logs = docker_client.images.build(
-            path=build_dir, tag=image_name, rm=True, **_kwargs
+        if system_deps:
+            _cmd.extend(["--build-arg", f"APT_PACKAGES={system_deps}"])
+
+        _cmd.append(build_dir)
+
+        _process = subprocess.Popen(
+            _cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
         )
 
-        for _log in _logs:
-            if "stream" in _log:
-                _log_stream = _log["stream"].strip()
-                logger.info(_log_stream)
+        for _line in _process.stdout:
+            logger.info(_line.strip())
 
+        _process.wait()
+
+        if _process.returncode != 0:
+            raise subprocess.CalledProcessError(_process.returncode, _cmd)
         logger.success("Successfully built bot docker image.")
     except Exception as err:
         logger.error(f"Failed to build bot docker: {str(err)}!")

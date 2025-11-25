@@ -6,7 +6,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from api.core.constants import ALPHANUM_REGEX
 from api.core.responses import BaseResponse
-from api.endpoints.challenge.schemas import MinerInput, MinerOutput, EvalPayload
+from api.endpoints.challenge.schemas import (
+    MinerInput,
+    MinerOutput,
+    EvalPayload,
+    RandomValRequest,
+)
 from api.endpoints.challenge import service
 from api.logger import logger
 from api.config import config
@@ -116,38 +121,22 @@ def _get_web(request: Request):
     summary="Random value",
     responses={401: {}, 422: {}, 429: {}},
 )
-def _post_random_val(
-    request: Request,
-    random_val: constr(strip_whitespace=True) = Body(  # type: ignore
-        ...,
-        embed=True,
-        min_length=4,
-        max_length=64,
-        pattern=ALPHANUM_REGEX,
-        title="Random value",
-        description="Random value.",
-        examples=["a1b2c3d4e5f6g7h8"],
-    ),
-):
-
+def post_random_val(request: Request, payload: RandomValRequest):
     _request_id = request.state.request_id
     logger.info(f"[{_request_id}] - Checking random val...")
 
-    _nonce_val: str
+    random_val = payload.random_val.strip()
+    nonce_val: str
     try:
-        _nonce_val = service.get_random_val(nonce=random_val)
-
+        nonce_val = service.get_random_val(nonce=random_val)
         logger.success(f"[{_request_id}] - Successfully checked the random val.")
     except Exception as err:
         if isinstance(err, HTTPException):
             raise
-
-        logger.error(
-            f"[{_request_id}] - Failed to check the random val!",
-        )
+        logger.error(f"[{_request_id}] - Failed to check the random val!")
         raise
 
-    _response = {"nonce_val": _nonce_val}
+    _response = {"nonce_val": nonce_val}
     return _response
 
 

@@ -1,6 +1,6 @@
-# Humanize Behaviour v3 Testing Manual
+# Humanize Behaviour v4 Testing Manual
 
-This manual provides instructions for testing the Humanize Behaviour v3 challenge using Docker.
+This manual provides instructions for testing the Humanize Behaviour v4 challenge using Docker.
 
 ## Overview
 
@@ -25,7 +25,7 @@ This manual provides instructions for testing the Humanize Behaviour v3 challeng
 ```bash
 # Clone the repository
 git clone https://github.com/RedTeamSubnet/RedTeam.git
-cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v3
+cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v4
 
 # Copy and configure the compose override file
 cp ./templates/compose/compose.override.dev.yml ./compose.override.yml

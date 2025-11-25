@@ -174,9 +174,21 @@ class EvalPayload(BaseModel):
     error: ErrorData
 
 
+class RandomValRequest(BaseModel):
+    random_val: str = Field(
+        ...,
+        min_length=4,
+        max_length=64,
+        pattern=ALPHANUM_REGEX,
+        title="Random value",
+        description="Random value.",
+        examples=["a1b2c3d4e5f6g7h8"]
+    )
+
 __all__ = [
     "KeyPairPM",
     "MinerInput",
     "MinerOutput",
     "EvalPayload",
+    "RandomValRequest"
 ]

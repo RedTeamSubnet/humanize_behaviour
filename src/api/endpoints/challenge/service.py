@@ -173,10 +173,8 @@ def score(miner_output: MinerOutput) -> float:
             dst_dir=_build_dir,
         )
 
-        _docker_client = docker.from_env()
         _image_name = "bot:latest"
         ch_utils.build_bot_image(
-            docker_client=_docker_client,
             build_dir=_build_dir,
             system_deps=miner_output.system_deps,
             image_name=_image_name,
@@ -190,6 +188,8 @@ def score(miner_output: MinerOutput) -> float:
                 error_enum=ErrorCodeEnum.TOO_MANY_REQUESTS,
                 message=f"No initialized key pairs or action lists, or out of tasks!",
             )
+
+        _docker_client = docker.from_env()
         ch_utils.run_bot_container(
             action_list=tm.cur_action_list,
             docker_client=_docker_client,

@@ -1,6 +1,19 @@
-# Humanize Behaviour v3 Challenge
+# Humanize Behaviour v4 Challenge
 
-The **Humanize Behaviour v3** is improved version of **Humanize Behaviour v2** designed to test the ability of a bot script to mimic human interaction with a Web UI form but now it has a new check which will compare the movement of a bot script in different sessions to see if the movements are dynamic. The challenge measures how well the bot script can interact with the form and submit the required information.
+**Humanize Behaviour v4** is an enhanced iteration of **Humanize Behaviour v3**, designed to more rigorously evaluate a bot script's ability to simulate human-like interaction with a web UI form.
+
+### Key Improvements:
+
+* **Dynamic Movement Check**:
+  The new version introduces a dynamic movement validation mechanism. It compares a bot’s cursor and interaction patterns across different sessions to ensure each interaction is unique and not deterministic or scripted.
+
+* **Session Termination Requirement**:
+  A new interaction step has been added where the bot must scroll down the page and click the **"End Session"** button. This simulates a natural user flow and ensures the bot is capable of full-page interaction.
+
+### Objective:
+
+The core goal of **Humanize Behaviour v4** is to test how effectively a bot can interact with a form in a way that mimics real human behavior, including natural input, varied motion patterns, and complete session flow.
+
 
 ## ✨ Features
 
@@ -13,6 +26,7 @@ The **Humanize Behaviour v3** is improved version of **Humanize Behaviour v2** d
 - FastAPI
 - Web service
 - **Trajectory similarity check**
+- **Session closing requirement** (scroll down and click "End Session" button)
 
 ---
 
@@ -49,14 +63,14 @@ cd ~/workspaces/projects
 
 ```sh
 git clone https://github.com/RedTeamSubnet/RedTeam.git && \
-    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v3
+    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v4
 ```
 
 **OPTION B.** Clone the repository (for **DEVELOPMENT**: git + ssh key):
 
 ```sh
 git clone --recursive git@github.com:RedTeamSubnet/RedTeam.git && \
-    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v3 && \
+    cd RedTeam/redteam_core/challenge_pool/humanize_behaviour_v4 && \
     git submodule update --init --recursive && \
     git submodule foreach --recursive git checkout main
 ```
