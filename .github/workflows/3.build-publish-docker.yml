@@ -73,7 +73,7 @@ jobs:
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/humanize_behaviour:cache-latest,mode=max
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/humanize_behaviour:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/humanize_behaviour:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/humanize_behaviour:v${{ env.VERSION }}
           push: true
 
       - name: Summary
