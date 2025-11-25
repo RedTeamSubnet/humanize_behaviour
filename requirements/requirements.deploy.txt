@@ -1,0 +1,2 @@
+git+https://github.com/RedTeamSubnet/module.rt-hb-score.git@v3.1.0#egg=rt_hb_score
+requirements/vault_unlock-0.1.0-cp310-abi3-manylinux_2_34_x86_64.whl

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "humanize_behavior"
+name = "humanize_behaviour"
 authors = [{ name = "RedTeam Subnet", email = "noreply@theredteam.io" }]
 description = "Bot detection challenge for Bittensor RedTeam Subnet"
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 keywords = ["bittensor", "redteam", "challenge", "bot-detection", "fastapi"]
-license = "MIT"
+license = { text = "MIT" }
 classifiers = [
 	"Development Status :: 3 - Alpha",
 	"Intended Audience :: Developers",
@@ -28,17 +28,19 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 
 
 [project.urls]
+Homepage = "https://github.com/RedTeamSubnet/humanize_behaviour"
 Repository = "https://github.com/RedTeamSubnet/humanize_behaviour"
 Documentation = "https://docs.theredteam.io"
-
+Issues = "https://github.com/RedTeamSubnet/humanize_behaviour/issues"
 
 
 [tool.setuptools]
 include-package-data = true
+packages = ["humanize_behaviour"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools.package-dir]
+humanize_behaviour = "."
 
 [tool.setuptools.dynamic]
-version = { attr = "api.__version__" }
+version = { attr = "humanize_behaviour.__version__" }
 dependencies = { file = ["requirements.txt"] }
