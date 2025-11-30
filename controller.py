@@ -111,40 +111,6 @@ class HBController(Controller):
                 [self._get_challenge_from_container() for _ in range(remaining_tasks)]
             )
 
-        for reference_commit in self.baseline_reference_comparison_commits_to_score:
-            try:
-                bt.logging.info(
-                    f"[CONTROLLER - HBController] Getting baseline reference: {reference_commit.docker_hub_id}"
-                )
-                self._setup_miner_container(reference_commit)
-
-                self._generate_scoring_logs(reference_commit, challenge_inputs)
-
-                docker_utils.remove_container_by_port(
-                    client=self.docker_client,
-                    port=constants.MINER_DOCKER_PORT,
-                )
-                docker_utils.clean_docker_resources(
-                    client=self.docker_client,
-                    remove_containers=True,
-                    remove_images=False,
-                )
-
-                bt.logging.info(
-                    f"[CONTROLLER - HBController] Baseline reference scoring logs: {len(reference_commit.scoring_logs)}"
-                )
-
-                HBController._baseline_reference_cache[
-                    reference_commit.docker_hub_id
-                ] = reference_commit
-
-            except Exception as e:
-                bt.logging.error(
-                    f"Error scoring baseline reference comparison, docker_hub_id: {reference_commit.docker_hub_id}: {e}"
-                )
-                bt.logging.error(traceback.format_exc())
-
-        # Score commits and build comparison logs
         for miner_commit in self.miner_commits:
             uid, hotkey = miner_commit.miner_uid, miner_commit.miner_hotkey
 
@@ -211,7 +177,9 @@ class HBController(Controller):
                 )
                 _scoring_log.score = 0.0
                 if _scoring_log.error:
-                    _scoring_log.error += " | Skipped scoring due to high comparison score."
+                    _scoring_log.error += (
+                        " | Skipped scoring due to high comparison score."
+                    )
                 else:
                     _scoring_log.error = "Skipped scoring due to high comparison score."
                 continue
@@ -227,11 +195,6 @@ class HBController(Controller):
             )
 
             _scoring_log.score = score
-
-    def _get_all_reference_commits(self):
-        return self.reference_comparison_commits + list(
-            HBController._baseline_reference_cache.values()
-        )
 
     def _exclude_output_keys(self, miner_output: dict, reference_output: dict):
         miner_output["bot_py"] = None
