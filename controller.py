@@ -42,44 +42,10 @@ class HBController(Controller):
             reference_comparison_commits,
             seed_inputs,
         )
-
-        # Get baseline reference comparison docker hub IDs from challenge info
-        self.baseline_reference_comparison_docker_hub_ids = self.challenge_info.get(
-            "baseline_reference_comparison_docker_hub_ids", []
-        )
-
         comparison_config = self.challenge_info.get("comparison_config", {})
         self.comparison_min_acceptable_score = comparison_config.get(
             "min_acceptable_score", 0.7
         )
-
-        # Initialize local storage for this instance
-        self.baseline_reference_comparison_commits_to_score: list[
-            MinerChallengeCommit
-        ] = []
-
-        for docker_hub_id in self.baseline_reference_comparison_docker_hub_ids:
-            # Check if this docker_hub_id is already in the class cache
-            if docker_hub_id in HBController._baseline_reference_cache:
-                cached_commit = HBController._baseline_reference_cache[docker_hub_id]
-                # Verify it has scoring logs (i.e., has been successfully scored)
-                if cached_commit.scoring_logs:
-                    bt.logging.info(
-                        f"[CONTROLLER - HBController] Reference commit {docker_hub_id} has already been scored, skipping"
-                    )
-                    continue
-
-            # If not in cache or not scored, add to list of commits to score
-            # Create a new commit object
-            new_commit = MinerChallengeCommit(
-                miner_uid=-1,
-                miner_hotkey="baseline-reference",
-                challenge_name=self.challenge_name,
-                docker_hub_id=docker_hub_id,
-            )
-
-            # Add to our instance list
-            self.baseline_reference_comparison_commits_to_score.append(new_commit)
 
     def start_challenge(self):
         """
@@ -126,15 +92,15 @@ class HBController(Controller):
             except Exception as e:
                 bt.logging.error(f"Error while processing miner {uid} - {hotkey}: {e}")
                 bt.logging.error(traceback.format_exc())
-                if uid != self.baseline_commit.miner_uid:
-                    miner_commit.scoring_logs.append(
-                        ScoringLog(
-                            miner_input=None,
-                            miner_output=None,
-                            score=0,
-                            error=str(e),
-                        )
+
+                miner_commit.scoring_logs.append(
+                    ScoringLog(
+                        miner_input=None,
+                        miner_output=None,
+                        score=0,
+                        error=str(e),
                     )
+                )
 
             # Clean up miner container
             docker_utils.remove_container_by_port(
