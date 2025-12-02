@@ -14,11 +14,6 @@ from redteam_core.validator.models import (
 
 
 class HBController(Controller):
-    # Class-level cache for baseline reference comparison commits
-    _baseline_reference_cache: dict[str, MinerChallengeCommit] = (
-        {}
-    )  # {docker_hub_id: MinerChallengeCommit}
-
     """
     A specialized controller for the 'humanize_behaviour_v3' challenge.
     Inherits from the base Controller and modifies specific logic.
@@ -54,10 +49,9 @@ class HBController(Controller):
         This process involves:
         1. Building and running the challenge container within an isolated Docker network.
         2. Generating or retrieving challenge inputs to evaluate miners.
-        3. Scoring a baseline Docker image, if specified, to establish a reference point.
-        4. Iteratively running each miner's Docker container to submit and score their solutions.
-        5. Collecting and logging the results, including any errors encountered during execution.
-        6. Cleaning up Docker resources to ensure no residual containers or images remain.
+        3. Iteratively running each miner's Docker container to submit and score their solutions.
+        4. Collecting and logging the results, including any errors encountered during execution.
+        5. Cleaning up Docker resources to ensure no residual containers or images remain.
 
         The method ensures that each miner's submission is evaluated against the challenge inputs,
         and comparison logs are generated to assess performance relative to reference commits.
