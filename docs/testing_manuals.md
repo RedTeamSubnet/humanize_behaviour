@@ -51,7 +51,7 @@ docker compose up -d
 
 ### Step 6: Test Your Bot
 
-- Visit: [https://localhost:10001/docs](https://localhost:10001/docs)
+- Visit: [http://localhost:10001/docs](http://localhost:10001/docs)
 - Test your bot using the `/score` endpoint
 
 ---
