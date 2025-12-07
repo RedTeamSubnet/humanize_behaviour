@@ -6,10 +6,8 @@ import bittensor as bt
 import numpy as np
 
 from redteam_core.validator.models import MinerChallengeCommit
-from redteam_core.validator.challenge_manager import (
-    ChallengeManager,
-    MinerChallengeInfo,
-)
+from redteam_core.validator.challenge_manager import ChallengeManager
+from redteam_core.validator.models import MinerChallengeInfo
 
 
 class HBChallengeManager(ChallengeManager):
