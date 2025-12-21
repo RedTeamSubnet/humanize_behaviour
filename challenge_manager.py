@@ -87,7 +87,9 @@ class HBChallengeManager(ChallengeManager):
             )
 
             # Update miner's best submission
-            miner_commit.scored_timestamp = time.time()
+
+            if not miner_commit.scored_timestamp:
+                miner_commit.scored_timestamp = time.time()
 
             if miner_commit.miner_uid not in self.miner_states:
                 self.miner_states[miner_commit.miner_uid] = MinerChallengeInfo(
